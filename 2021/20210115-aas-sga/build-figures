@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-"""Generate the figures for Paper I (stellar mass density profiles).
+"""Generate the figures for the SGA AAS poster.
+
+/mnt/code/talks-and-plots/2021/20210115-aas-sga/build-figures --surface-brightness
 
 """
 import os, sys, time, pdb
@@ -10,14 +12,18 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
         
-#import legacyhalos.io
-#from legacyhalos.legacyhalos import ZCOLUMN, RICHCOLUMN, DIAMCOLUMN, RACOLUMN, DECCOLUMN
-#from legacyhalos.legacyhalos import get_galaxy_galaxydir
+import legacyhalos.SGA
+from legacyhalos.SGA import get_galaxy_galaxydir
+from legacyhalos.SGA import DIAMCOLUMN, RACOLUMN, DECCOLUMN
 #from legacyhalos.legacyhalos import legacyhalos_cosmology
 #cosmo = legacyhalos_cosmology()
 
-figdir = os.path.join(os.getenv('HOME'), 'research', 'talks', '2021', '20210115-aas')
-fonttype = os.path.join(os.getenv('SGA_CODE_DIR'), 'py', 'SGA', 'data', 'Georgia-Italic.ttf')
+figdir = os.path.join('/mnt', '20210115-aas-sga')
+#figdir = os.path.join(os.getenv('HOME'), 'research', 'talks', '2021', '20210115-aas-sga')
+fonttype = os.path.join(os.getenv('LEGACYHALOS_CODE_DIR'), 'py', 'SGA', 'data', 'Georgia-Italic.ttf')
+
+#os.environ['LEGACYHALOS_DIR'] = os.path.join(os.getenv('HOME'), 'research', 'projects', 'SGA')
+#os.environ['LEGACYHALOS_DATA_DIR'] = figdir
 
 def plot_style(font_scale=1.2, paper=False, talk=True):
 
@@ -53,7 +59,7 @@ def fig_sky(png=None):
     import matplotlib.cm as cm
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-    sns, _ = plot_style(talk=True, font_scale=1.4)
+    sns, _ = plot_style(talk=True, font_scale=0.8)
 
     # read the sample
     S = fits_table(os.path.join(figdir, 'SGA-ellipse-v3.2.kd.fits'),
@@ -83,7 +89,7 @@ def fig_sky(png=None):
 
     # build the figure
     fig = plt.figure(figsize=(12,8))
-    plt.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.95)
+    plt.subplots_adjust(left=0.05, right=0.95, bottom=0.08, top=0.95)
 
     dec_lo = -90
     ra_labels_dec = -30
@@ -119,7 +125,7 @@ def fig_sky(png=None):
 
     ok,xx,yy = wcs.radec2pixelxy(ra_labels, ra_labels_dec)
     for x,y,v in zip(xx, yy, ra_labels):
-        plt.text(x, y, '%i'%(v%360), ha='center', va='top', alpha=0.5)
+        plt.text(x, y, '%i'%(v%360), ha='center', va='top', alpha=1, fontsize=12)
     ok,xx,yy = wcs.radec2pixelxy(dec_labels_ra, dec_labels)
     for i,(x,y,v,slope) in enumerate(zip(xx, yy, dec_labels, dec_gridlines_slope)):
         dx = -20
@@ -128,7 +134,7 @@ def fig_sky(png=None):
         dx = dx * 15 / r
         dy = dy * 15 / r
         #print(v, 'dx,dy', dx, dy)
-        plt.text(x+dx, y+dy, '%+i'%v, ha='center', va='center', alpha=0.5)
+        plt.text(x+dx, y+dy, '%+i'%v, ha='center', va='center', alpha=1, fontsize=12)
         if v == 50:
             #angle = np.rad2deg(np.arctan2(dy, dx))
             angle = np.rad2deg(np.arctan2(yy[i+1]-yy[i-1], xx[i+1]-xx[i-1]))
@@ -140,9 +146,9 @@ def fig_sky(png=None):
     ok,xx,yy = wcs.radec2pixelxy(rr, dd)
 
     # Label
-    ii = np.argmin(np.abs(rr - 285))
+    ii = np.argmin(np.abs(rr - 275))
     angle = 180+np.rad2deg(np.arctan2(yy[ii+1]-yy[ii-1], xx[ii+1]-xx[ii-1]))
-    plt.text(xx[ii], yy[ii], 'Galactic plane', ha='center', va='bottom', rotation=angle)
+    plt.text(xx[ii], yy[ii], 'Galactic Plane', ha='center', va='bottom', rotation=angle)
 
     # Plot segments that are above min Dec and not discontinuous
     d = np.append([0], np.hypot(np.diff(xx), np.diff(yy)))
@@ -159,7 +165,7 @@ def fig_sky(png=None):
             plt.plot(xx[istart:iend], yy[istart:iend], '-', color='0.6', lw=2)
         istart = iend
 
-    ok,x,y = wcs.radec2pixelxy(ra_center, -40)
+    ok,x,y = wcs.radec2pixelxy(ra_center, -45)
     plt.text(x, y, 'RA (deg)')
 
     plt.xticks([])
@@ -178,15 +184,15 @@ def fig_sky(png=None):
     density = (sgacount/pixelarea)
     density[sgacount==0] = np.nan
 
-    im = plt.imshow(density, vmin=0, vmax=50, cmap='Blues', origin='lower', interpolation='nearest');
+    im = plt.imshow(density, vmin=0, vmax=40, cmap='Blues', origin='lower', interpolation='nearest');
     ax = plt.gca()
 
     divider = make_axes_locatable(ax)
-    cax = divider.new_vertical(size="5%", pad=0.7, pack_start=True)
+    cax = divider.new_vertical(size="5%", pad=0.3, pack_start=True)
     fig.add_axes(cax)
 
     c = fig.colorbar(im, cax=cax, orientation='horizontal')
-    c.set_label(r'Density (galaxies deg$^{-2}$)')
+    c.set_label(r'Surface Density (galaxies deg$^{-2}$)')
 
     if png:
         pngfile = os.path.join(figdir, png)
@@ -692,14 +698,13 @@ def fig_surface_brightness(sample, thisgalaxy, png):
     galaxy, galaxydir = get_galaxy_galaxydir(sample)
     this = np.where(galaxy == thisgalaxy)[0][0]
 
-    onegal, galaxy, galaxydir = sample[this], galaxy[this], galaxydir[this]
-    print(thisgalaxy, onegal[ZCOLUMN], onegal[RICHCOLUMN])
-
-    filesuffix = 'custom'
+    onegal, galaxy, galaxydir = np.atleast_1d(sample)[this], np.atleast_1d(galaxy)[this], np.atleast_1d(galaxydir)[this]
+    filesuffix = 'largegalaxy'
+    galaxy_id = '{}'.format(onegal['SGA_ID'])
+    galaxy_id = '1121465'
 
     # Read the data and the ellipse-fitting results.
-    ellipsefit = read_ellipsefit(galaxy, galaxydir, filesuffix=filesuffix,
-                                 galaxy_id='', verbose=True)
+    ellipsefit = read_ellipsefit(galaxy, galaxydir, filesuffix=filesuffix, galaxy_id=galaxy_id, verbose=True)
 
     data, _ = read_multiband(galaxy, galaxydir, filesuffix=filesuffix, verbose=True)
 
@@ -1049,11 +1054,13 @@ def main():
     parser.add_argument('--clobber', action='store_true', help='Overwrite existing files.')
     args = parser.parse_args()
 
-    #sample = legacyhalos.legacyhalos.read_redmapper()
-    #galaxy, galaxydir = get_galaxy_galaxydir(sample)
-    #for onegal in sample:
-    #    _galaxy, _ = get_galaxy_galaxydir(onegal)
-    #    print(_galaxy, onegal[ZCOLUMN], onegal[RICHCOLUMN])
+    sample = legacyhalos.SGA.read_sample(galaxylist='PGC193199_GROUP')
+    #fullsample = legacyhalos.SGA.read_sample(galaxylist='PGC193199_GROUP', preselect_sample=False)
+
+    galaxy, galaxydir = get_galaxy_galaxydir(sample)
+    for onegal in sample:
+        _galaxy, _ = get_galaxy_galaxydir(onegal)
+        print(_galaxy, onegal[RACOLUMN], onegal[DECCOLUMN], onegal[DIAMCOLUMN])
     
     # Fig - spatial distribution on the sky
     if args.sky:
@@ -1087,13 +1094,13 @@ def main():
     #if args.ellipse_multiband:
     #    fig_ellipse_multiband(sample, thisgalaxy='0001129-034040952', png='ellipse_multiband.png')
     #
-    ## Fig - surface brightness
-    #if args.surface_brightness:
-    #    #fig_surface_brightness(sample, thisgalaxy='0000195-052316929', png='test-surface_brightness.png')
-    #    for gal in galaxy:
-    #        fig_surface_brightness(sample, thisgalaxy=gal, png='surface_brightness_{}.png'.format(gal))
-    #    #fig_surface_brightness(sample, thisgalaxy='0000195-052316929', png='surface_brightness.png')
-    #    #fig_surface_brightness(sample, thisgalaxy='0001129-034040952', png='surface_brightness.png')
+    # Fig - surface brightness
+    if args.surface_brightness:
+        fig_surface_brightness(sample, thisgalaxy='PGC193199_GROUP', png='PGC193199_GROUP-sbmontage.png')
+        #for gal in galaxy:
+        #    fig_surface_brightness(sample, thisgalaxy=gal, png='surface_brightness_{}.png'.format(gal))
+        #fig_surface_brightness(sample, thisgalaxy='0000195-052316929', png='surface_brightness.png')
+        #fig_surface_brightness(sample, thisgalaxy='0001129-034040952', png='surface_brightness.png')
 
 if __name__ == '__main__':
     main()
