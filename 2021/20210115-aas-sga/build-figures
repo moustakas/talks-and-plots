@@ -15,8 +15,8 @@ import matplotlib.ticker as ticker
 import legacyhalos.SGA
 from legacyhalos.SGA import get_galaxy_galaxydir
 from legacyhalos.SGA import DIAMCOLUMN, RACOLUMN, DECCOLUMN
-#from legacyhalos.legacyhalos import legacyhalos_cosmology
-#cosmo = legacyhalos_cosmology()
+
+from astropy.table import Table
 
 figdir = os.path.join('/mnt', '20210115-aas-sga')
 #figdir = os.path.join(os.getenv('HOME'), 'research', 'talks', '2021', '20210115-aas-sga')
@@ -53,6 +53,68 @@ def plot_style(font_scale=1.2, paper=False, talk=True):
 
     return sns, colors
 
+def fig_size_mag(sample, frac=None, png=None):
+    """
+    
+    """
+    import corner
+
+    sns, _ = plot_style(talk=True, font_scale=1.2)
+    
+    good = np.where((sample['RADIUS_SB26'] != -1) * (sample['R_MAG_SB26'] != -1))[0]
+    rmag = sample['R_MAG_SB26'][good]
+    radius = np.log10(sample['RADIUS_SB26'][good]/60) # [arcmin]
+    
+    xlim, ylim = (8, 20), (-1, 1)
+
+    @ticker.FuncFormatter
+    def major_formatter(x, pos):
+        if x >= 0:
+            return '{:.0f}'.format(10**x)
+        else:
+            return '{:.1f}'.format(10**x)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+           
+    #ax.scatter(sample['R_MAG_SB26'][good], np.log10(sample['RADIUS_SB26'][good]),
+    #           marker='s', edgecolors='k', s=1, 
+    #           alpha=0.5, lw=1, color='firebrick')
+    #ax.hexbin(sample['R_MAG_SB26'][ww], np.log10(sample['RADIUS_SB26'][ww]/60),
+    #          mincnt=1, gridsize=25, cmap='viridis')
+    corner.hist2d(rmag, radius,
+                  levels=[0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99],
+                  bins=100, smooth=True, color='tan', ax=ax, # mpl.cm.get_cmap('viridis'),
+                  plot_density=True, fill_contours=True, range=(xlim, ylim),
+                  data_kwargs={'color': 'navy', 'alpha': 0.2, 'ms': 3},
+                  contour_kwargs={'colors': 'k'}
+                 )
+    ax.yaxis.set_major_formatter(major_formatter)
+    ax.set_yticks(np.log10([0.1, 0.2, 0.5, 1, 2, 5, 10]))
+
+    #big = np.where(sample['RADIUS_SB26'][good]/60 > 2)[0]
+    #ingc = np.where(['NGC' in gg or 'UGC' in gg for gg in sample['GALAXY'][big]])[0]
+    #ingc = np.where(['NGC' in gg for gg in sample['GALAXY'][good]])[0]
+    #ax.scatter(rmag[ingc], radius[ingc], marker='s', edgecolors='k',
+    #           s=10, alpha=1.0, lw=1, color='k')
+    
+
+    # labels and all that
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    #ax.set_yscale('log')
+    #ax.xmargins(0)
+    ax.set_xlabel(r'$m_{r}(<R_{26})$ (AB mag)')
+    ax.set_ylabel(r'$R_{26}$ (arcmin)')
+    #ax.set_ylabel(r'$\log_{10}\ R_{26}$ (arcmin)')
+    
+    fig.subplots_adjust(bottom=0.15, top=0.95, right=0.95, left=0.15)
+
+    if png:
+        pngfile = os.path.join(figdir, png)
+        print('Writing {}'.format(pngfile))
+        fig.savefig(pngfile)#, bbox_inches='tight')
+        plt.close(fig)
+
 def fig_sb_mag(sample, frac=None, png=None):
     """Surface brightness vs r-band magnitude.
     
@@ -60,21 +122,27 @@ def fig_sb_mag(sample, frac=None, png=None):
     import corner
     from astropy.table import Table
 
-    sns, _ = plot_style(talk=True, font_scale=0.8)
+    sns, _ = plot_style(talk=True, font_scale=1.2)
     
     # add some columns from legacyhalos/bin/sandbox/NLSA-build-parent
-    good = np.where((sample['TYPE'] != 'PSF') * (sample['FLUX_R'] > 0))[0]
+    #good = np.where((sample['TYPE'] != 'PSF') * (sample['FLUX_R'] > 0))[0]
+    good = np.where((sample['RADIUS_SB26'] != -1) * (sample['R_MAG_SB26'] != -1))[0]
 
-    cat = Table()
-    cat['galaxy'] = sample['GALAXY']
-    cat['sga_id'] = sample['SGA_ID']
-    cat['reff'] = sample['SHAPE_R'] # [arcsec]
-    cat['rmag'] = 22.5 - 2.5 * np.log10(sample['FLUX_R'])
-    cat['sb'] = cat['rmag'] + 2.5 * np.log10(2 * np.pi * cat['reff']**2)
+    rmag = sample['R_MAG_SB26'][good]
+    radius = sample['RADIUS_SB26'][good] # [arcsec]
+    sb = rmag + 2.5 * np.log10(2 * np.pi * radius**2)
+
+    #cat = Table()
+    #cat['galaxy'] = sample['GALAXY']
+    #cat['sga_id'] = sample['SGA_ID']
+    #cat['reff'] = sample['SHAPE_R'] # [arcsec]
+    #cat['rmag'] = 22.5 - 2.5 * np.log10(sample['FLUX_R'])
+    #cat['sb'] = cat['rmag'] + 2.5 * np.log10(2 * np.pi * cat['reff']**2)
     
-    xlim, ylim = (9, 19), (28, 15)
+    xlim = (8, 20)
+    ylim = (27, 21)
     #xlim, ylim = (12, 22), (18, 28)
-    rmag, sb, reff = cat['rmag'], cat['sb'], cat['reff']
+    #rmag, sb, reff = cat['rmag'], cat['sb'], cat['reff']
 
     if False:
         print('Hack to remove sources that hit their optimization limit.')
@@ -93,17 +161,17 @@ def fig_sb_mag(sample, frac=None, png=None):
     
     fig, ax = plt.subplots(figsize=(8, 6))
     corner.hist2d(rmag, sb, levels=[0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99],
-                  bins=100, smooth=True, color='tan', # mpl.cm.get_cmap('viridis'),
-                  plot_density=True, fill_contours=True,
+                  bins=100, smooth=True, color='tan', ax=ax, # mpl.cm.get_cmap('viridis'),
+                  plot_density=True, fill_contours=True, range=(xlim, ylim),
                   data_kwargs={'color': 'navy', 'alpha': 0.2, 'ms': 3},
                   contour_kwargs={'colors': 'k'}
                  )
            
     # overplot lines of constant size
     magarr = np.linspace(xlim[0], xlim[1], 50)
-    for size, xpos, ypos in zip((0.3, 1, 3, 10, 30, 100),
-                                (None, None, None, 12.2, 12.2, 12.2),
-                                (18.0, 18.0, 18.0, None, None, None)):
+    for size, xpos, ypos in zip((3, 10, 30, 100, 300),
+                                (None, None, None, None, None),
+                                (22.0, 22.0, 22.0, 22.0, 23.0)):
         sbarr = magarr + 2.5 * np.log10(2 * np.pi * size**2)
         ax.plot(magarr, sbarr, color='k', lw=2, ls='--', alpha=0.8)
         
@@ -112,11 +180,11 @@ def fig_sb_mag(sample, frac=None, png=None):
         if xpos:
             ypos = xpos + 2.5 * np.log10(2 * np.pi * size**2)
             
-        ax.text(xpos, ypos, r'$r_{{50}}={0:g}^{{\prime\prime}}$'.format(size), 
-                ha='left', va='center', rotation=-30, fontsize=16, alpha=1.0)
+        ax.text(xpos, ypos, r'$R_{{26}}={0:g}^{{\prime\prime}}$'.format(size), 
+                ha='left', va='center', rotation=-60, fontsize=16, alpha=1.0)
 
-    check = np.where( (cat['sb'] > cat['rmag']+2.5*np.log10(2*np.pi*10**2)) * (cat['rmag'] < 18) )[0]
-    print(len(check), len(cat))
+    #check = np.where( (cat['sb'] > cat['rmag']+2.5*np.log10(2*np.pi*10**2)) * (cat['rmag'] < 18) )[0]
+    #print(len(check), len(cat))
     #ax.scatter(cat['rmag'][check], cat['sb'][check], color='blue', marker='s', s=10)
     #for ii, cc in enumerate(check[:30]):
     #    print('gal{}'.format(ii), cat['ra'][cc], cat['dec'][cc], cat['reff'][cc], 
@@ -126,11 +194,11 @@ def fig_sb_mag(sample, frac=None, png=None):
     #ax.scatter(cat['rmag'][lgal], cat['sb'][lgal], marker='s', edgecolors='k', s=30, 
     #           alpha=0.5, lw=1, color='firebrick')
     
-    ingc = np.where(['NGC' in gg or 'UGC' in gg for gg in cat['galaxy']])[0]
+    #ingc = np.where(['NGC' in gg or 'UGC' in gg for gg in cat['galaxy']])[0]
     #ax.scatter(cat['rmag'][ingc], cat['sb'][ingc], marker='s', edgecolors='k', s=30, 
     #           alpha=0.5, lw=1, color='firebrick')
     
-    ingc = np.where(['NGC' in gg for gg in cat['galaxy']])[0]
+    #ingc = np.where(['NGC' in gg for gg in cat['galaxy']])[0]
     #print(cat[ingc])
     #for ii in ingc:
     #    ax.text(cat['rmag'][ii], cat['sb'][ii], cat['galaxy'][ii], 
@@ -141,9 +209,9 @@ def fig_sb_mag(sample, frac=None, png=None):
     ax.set_ylim(ylim)
     #ax.xmargins(0)
     ax.set_xlabel(r'$m_{r}$ (AB mag)')
-    ax.set_ylabel(r'$\mu_{50,r}$ (AB mag arcsec$^{-2}$)')
+    ax.set_ylabel(r'$\langle \mu_{r, R_{26}}\rangle$ (AB mag arcsec$^{-2}$)')
     
-    fig.subplots_adjust(bottom=0.15, top=0.95, right=0.95)
+    fig.subplots_adjust(bottom=0.15, top=0.95, right=0.95, left=0.15)
 
     if png:
         pngfile = os.path.join(figdir, png)
@@ -300,7 +368,7 @@ def fig_sky(png=None):
         fig.savefig(pngfile)
         plt.close(fig)            
 
-def fig_surface_brightness(sample, thisgalaxy, png):
+def fig_sbmontage(onegal, png):
     """Make one large figure with the surface brightness profile fitting results for
     a single galaxy.
 
@@ -333,10 +401,9 @@ def fig_surface_brightness(sample, thisgalaxy, png):
     filesuffix = 'largegalaxy'
 
     #print(sample)
-    galaxy, galaxydir = get_galaxy_galaxydir(sample)
-    this = np.where(galaxy == thisgalaxy)[0][0]
-
-    onegal, galaxy, galaxydir = np.atleast_1d(sample)[this], np.atleast_1d(galaxy)[this], np.atleast_1d(galaxydir)[this]
+    galaxy, galaxydir = get_galaxy_galaxydir(onegal)
+    #this = np.where(galaxy == thisgalaxy)[0][0]
+    #onegal, galaxy, galaxydir = np.atleast_1d(sample)[this], np.atleast_1d(galaxy)[this], np.atleast_1d(galaxydir)[this]
 
     data, galaxyinfo = read_multiband(galaxy, galaxydir, filesuffix=filesuffix, verbose=True)
 
@@ -365,28 +432,35 @@ def fig_surface_brightness(sample, thisgalaxy, png):
 
     #fig, ax = plt.subplots(1, 3, figsize=(8*3, 8), sharex=True)
     fig = plt.figure(figsize=(16, 16))
-    gs1 = fig.add_gridspec(3, 1, bottom=0.04, top=0.96, left=0.02, right=0.35,
-                           height_ratios=[1, 1, 1], hspace=0.01)
+    gs1 = fig.add_gridspec(3, 1, bottom=0.04, top=0.96, left=0.0, right=0.35,
+                           height_ratios=[1, 1, 1], hspace=0.03)
 
     ax0 = fig.add_subplot(gs1[0])
     with Image.open(os.path.join(galaxydir, '{}-{}-image-grz.jpg'.format(galaxy, filesuffix))) as img:
+        draw = ImageDraw.Draw(img)
+        sz = img.size
+        if scaledfont:
+            fntsize = np.round(sz[0]/20).astype('int')
+        else:
+            fntsize = 20 # np.round(sz[0]/20).astype('int')
+        font = ImageFont.truetype(fonttype, size=fntsize)
+
+        txt = 'Image Stack'
+        ww, hh = draw.textsize(txt, font=font)
+        x0, x1, y0 = 0+fntsize*0.8, 0+fntsize*1.5+ww, fntsize*1.5
+        dx = ((x1-x0) - ww)//2
+        draw.text((x0+dx, y0), txt, font=font)
+            
         if barlen and barlabel:
-            sz = img.size
-            draw = ImageDraw.Draw(img)
             width = np.round(sz[0]/150).astype('int')
-            if scaledfont:
-                fntsize = np.round(sz[0]/30).astype('int')
-            else:
-                fntsize = 20 # np.round(sz[0]/20).astype('int')
-            font = ImageFont.truetype(fonttype, size=fntsize)
             # Add a scale bar and label--
-            x0, x1, y0, y1 = 0+fntsize*2, 0+fntsize*2+barlen, sz[1]-fntsize*2, sz[1]-fntsize*2.5#4
+            x0, x1, y0, y1 = 0+fntsize*1.5, 0+fntsize*2+barlen, sz[1]-fntsize*2, sz[1]-fntsize*2.5
             draw.line((x0, y1, x1, y1), fill='white', width=width)
             ww, hh = draw.textsize(barlabel, font=font)
             dx = ((x1-x0) - ww)//2
             #print(x0, x1, y0, y1, ww, x0+dx, sz)
             draw.text((x0+dx, y0), barlabel, font=font)
-            
+
         # First display the data mosaic
         ax0.imshow(img, interpolation='nearest')
         ax0.xaxis.set_ticklabels([])
@@ -397,6 +471,20 @@ def fig_surface_brightness(sample, thisgalaxy, png):
     # Now the model mosaic
     ax1 = fig.add_subplot(gs1[1])
     with Image.open(os.path.join(galaxydir, '{}-{}-model-grz.jpg'.format(galaxy, filesuffix))) as img:
+        draw = ImageDraw.Draw(img)
+        sz = img.size
+        if scaledfont:
+            fntsize = np.round(sz[0]/20).astype('int')
+        else:
+            fntsize = 20 # np.round(sz[0]/20).astype('int')
+        font = ImageFont.truetype(fonttype, size=fntsize)
+
+        txt = 'Image Model'
+        ww, hh = draw.textsize(txt, font=font)
+        x0, x1, y0 = 0+fntsize*0.8, 0+fntsize*1.5+ww, fntsize*1.5
+        dx = ((x1-x0) - ww)//2
+        draw.text((x0+dx, y0), txt, font=font)
+
         ax1.imshow(img, interpolation='nearest')
         ax1.xaxis.set_ticklabels([])
         ax1.yaxis.set_ticklabels([])
@@ -416,8 +504,8 @@ def fig_surface_brightness(sample, thisgalaxy, png):
     ax2 = fig.add_subplot(gs1[2])
     ax2.imshow(dat, origin='lower', norm=norm, cmap=cmap, #cmap=cmap[filt],
                interpolation='nearest')
-    plt.text(0.1, 0.9, filt, transform=ax2.transAxes, fontweight='bold',
-             ha='center', va='center', color='k', fontsize=26)
+    plt.text(0.08, 0.9, r'${}$-band Image'.format(filt), transform=ax2.transAxes, #fontweight='bold',
+             ha='left', va='center', color='k', fontsize=18)
 
     smas = np.linspace(0, ellipsefit['{}_sma'.format(filt)].max(), nplot)
     for sma in smas:
@@ -468,7 +556,7 @@ def fig_surface_brightness(sample, thisgalaxy, png):
 
     # [2] surface brightness and color profile
     gs2 = fig.add_gridspec(3, 1, bottom=0.08, top=0.93, left=0.42,
-                           right=0.98, hspace=0.06, height_ratios=[2.9, 1.4, 2])
+                           right=0.98, hspace=0.04, height_ratios=[2.9, 1.4, 2])
     
     minerr, use_ylim, plot_radius = 0.0, None, False
     
@@ -506,7 +594,7 @@ def fig_surface_brightness(sample, thisgalaxy, png):
         if np.nanmax(radius) > xminmax[1]:
             xminmax[1] = np.nanmax(radius)
 
-    ax1.set_ylabel(r'$\mu$ (mag arcsec$^{-2}$)')
+    ax1.set_ylabel(r'$\mu(r)$ (mag arcsec$^{-2}$)')
     #ax1.set_ylabel(r'Surface Brightness $\mu(a)$ (mag arcsec$^{-2}$)')
 
     ylim = [yminmax[0]-0.75, yminmax[1]+0.5]
@@ -521,13 +609,14 @@ def fig_surface_brightness(sample, thisgalaxy, png):
         ax1.set_ylim(ylim)
     ax1.invert_yaxis()
 
-    xlim = [xminmax[0], xminmax[1]*1.01]
+    xlim = [xminmax[0], xminmax[1]*1.0]
     ax1.set_xlim(xlim)
 
     hh, ll = ax1.get_legend_handles_labels()
     if len(hh) > 0:
         leg1 = ax1.legend(loc='upper right', fontsize=18, frameon=True)
-        ax1.set_title(galaxyinfo[igal]['galaxy'][0])
+        ax1.set_title('{} ({})'.format(onegal['GALAXY'][0], onegal['GROUP_NAME'][0].replace('_', ' ')))
+        #ax1.set_title(galaxyinfo[igal]['galaxy'][0])
 
     # Now the color-radius plot
     if sbprofile['radius_gr'][0] != -1:
@@ -550,7 +639,7 @@ def fig_surface_brightness(sample, thisgalaxy, png):
         #ax2.legend(bbox_to_anchor=(0.25, 0.98))
 
     ax2.set_ylabel('Color (mag)')
-    ax2.set_ylim(-1, 3)
+    ax2.set_ylim(0.4, 1.3)
     ax2.set_xlim(xlim)
     #ax2.autoscale(False) # do not scale further
 
@@ -567,7 +656,7 @@ def fig_surface_brightness(sample, thisgalaxy, png):
              transform=ax1.transAxes, fontsize=18)
 
     # [3] curve of growth
-    ax3 = fig.add_subplot(gs2[2], sharex=ax1)
+    ax3 = fig.add_subplot(gs2[2], sharex=ax2)
     colors = _sbprofile_colors()
 
     maxsma = 0
@@ -612,7 +701,7 @@ def fig_surface_brightness(sample, thisgalaxy, png):
         if cog[inrange].min() < ybright:
             ybright = cog[inrange].min()
 
-    ax3.set_xlabel(r'(Semi-major axis $r$)$^{1/4}$ (arcsec)')
+    ax3.set_xlabel(r'Semi-major axis $r^{1/4}$ (arcsec)$^{1/4}$')
     #ax3.set_ylabel('Cumulative brightness (AB mag)')
     #ax3.set_xlabel(r'(Galactocentric radius $r$)$^{1/4}$ (arcsec)')    
     ax3.set_ylabel(r'm$(<r)$ (mag)')
@@ -652,24 +741,251 @@ def fig_surface_brightness(sample, thisgalaxy, png):
         fig.savefig(pngfile)#, bbox_inches='tight')
         plt.close(fig)
 
+def fig_sbmontage_gallery(onegal, png):
+    """Like fig_sbmontage but with fewer panels so the figures can be used in
+    landscape mode for the poster gallery.
+
+    """
+    import numpy.ma as ma
+
+    from PIL import Image, ImageDraw, ImageFont
+    from photutils import EllipticalAperture
+    import matplotlib.patches as mpatches
+
+    from astropy.visualization import ImageNormalize
+    from astropy.visualization import AsinhStretch as Stretch
+    from astropy.visualization import ZScaleInterval as Interval
+
+    from legacyhalos.io import read_ellipsefit
+    from legacyhalos.ellipse import ellipse_sbprofile, CogModel
+    from legacyhalos.qa import _sbprofile_colors
+    from legacyhalos.SGA import read_multiband
+
+    sns, _ = plot_style(talk=True, font_scale=1.4)
+    
+    # https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html
+    #cmap = plt.cm.plasma
+    #cmap = plt.cm.cividis
+    cmap = plt.cm.inferno
+    #cmap = plt.cm.viridis
+    stretch = Stretch(a=0.9)
+    interval = Interval(contrast=0.5, nsamples=10000)
+
+    filesuffix = 'largegalaxy'
+
+    #print(sample)
+    galaxy, galaxydir = get_galaxy_galaxydir(onegal)
+    #this = np.where(galaxy == thisgalaxy)[0][0]
+    #onegal, galaxy, galaxydir = np.atleast_1d(sample)[this], np.atleast_1d(galaxy)[this], np.atleast_1d(galaxydir)[this]
+
+    data, galaxyinfo = read_multiband(galaxy, galaxydir, filesuffix=filesuffix, verbose=True)
+
+    igal = 1
+    galaxy_id = '{}'.format(data['galaxy_id'][igal])
+    #galaxy_id = '1121465'
+    #galaxy_indx = 1
+
+    # Read the data and the ellipse-fitting results.
+    ellipsefit = read_ellipsefit(galaxy, galaxydir, filesuffix=filesuffix, galaxy_id=galaxy_id, verbose=True)
+
+    scaledfont = True
+    barlen_arcsec = 60.0 # [arcsec]
+    barlen = np.ceil(barlen_arcsec / data['refpixscale']).astype(int) # [pixels]
+    #barlen_kpc = barlen_arcsec * arcsec2kpc
+    
+    barlabel = '1 arcmin'
+    #barlabel = '1 arcmin = {:.0f} kpc'.format(barlen_kpc)
+
+    band = data['bands']
+    nband = len(band)
+
+    nplot = 12
+    sma_lw = 2
+    sma_alpha = 0.8
+
+    #fig, ax = plt.subplots(1, 3, figsize=(8*3, 8), sharex=True)
+    fig = plt.figure(figsize=(16, 9))
+    gs1 = fig.add_gridspec(2, 1, bottom=0.04, top=0.96, left=0.0, right=0.35,
+                           height_ratios=[1, 1], hspace=0.03)
+
+    ax0 = fig.add_subplot(gs1[0])
+    with Image.open(os.path.join(galaxydir, '{}-{}-image-grz.jpg'.format(galaxy, filesuffix))) as img:
+        draw = ImageDraw.Draw(img)
+        sz = img.size
+        if scaledfont:
+            fntsize = np.round(sz[0]/20).astype('int')
+        else:
+            fntsize = 20 # np.round(sz[0]/20).astype('int')
+        font = ImageFont.truetype(fonttype, size=fntsize)
+
+        txt = 'Image Stack'
+        ww, hh = draw.textsize(txt, font=font)
+        x0, x1, y0 = 0+fntsize*0.8, 0+fntsize*1.5+ww, fntsize*1.5
+        dx = ((x1-x0) - ww)//2
+        draw.text((x0+dx, y0), txt, font=font)
+            
+        if barlen and barlabel:
+            width = np.round(sz[0]/150).astype('int')
+            # Add a scale bar and label--
+            x0, x1, y0, y1 = 0+fntsize*1.5, 0+fntsize*2+barlen, sz[1]-fntsize*2, sz[1]-fntsize*2.5
+            draw.line((x0, y1, x1, y1), fill='white', width=width)
+            ww, hh = draw.textsize(barlabel, font=font)
+            dx = ((x1-x0) - ww)//2
+            #print(x0, x1, y0, y1, ww, x0+dx, sz)
+            draw.text((x0+dx, y0), barlabel, font=font)
+
+        # First display the data mosaic
+        ax0.imshow(img, interpolation='nearest')
+        ax0.xaxis.set_ticklabels([])
+        ax0.yaxis.set_ticklabels([])
+        ax0.xaxis.set_ticks([])
+        ax0.yaxis.set_ticks([])
+
+    # Now the model mosaic
+    ax1 = fig.add_subplot(gs1[1])
+    with Image.open(os.path.join(galaxydir, '{}-{}-model-grz.jpg'.format(galaxy, filesuffix))) as img:
+        draw = ImageDraw.Draw(img)
+        sz = img.size
+        if scaledfont:
+            fntsize = np.round(sz[0]/20).astype('int')
+        else:
+            fntsize = 20 # np.round(sz[0]/20).astype('int')
+        font = ImageFont.truetype(fonttype, size=fntsize)
+
+        txt = 'Image Model'
+        ww, hh = draw.textsize(txt, font=font)
+        x0, x1, y0 = 0+fntsize*0.8, 0+fntsize*1.5+ww, fntsize*1.5
+        dx = ((x1-x0) - ww)//2
+        draw.text((x0+dx, y0), txt, font=font)
+
+        ax1.imshow(img, interpolation='nearest')
+        ax1.xaxis.set_ticklabels([])
+        ax1.yaxis.set_ticklabels([])
+        ax1.xaxis.set_ticks([])
+        ax1.yaxis.set_ticks([])
+
+    for xx in (ax0, ax1):
+        xx.xaxis.set_ticklabels([])
+        xx.yaxis.set_ticklabels([])
+        xx.xaxis.set_ticks([])
+        xx.yaxis.set_ticks([])
+
+    # [2] surface brightness and color profile
+    gs2 = fig.add_gridspec(2, 1, bottom=0.08, top=0.93, left=0.42,
+                           right=0.98, hspace=0.04, height_ratios=[2.9, 1.4])
+    
+    minerr, use_ylim, plot_radius = 0.0, None, False
+    
+    sbprofile = ellipse_sbprofile(ellipsefit, minerr=minerr, sma_not_radius=~plot_radius,
+                                  cut_on_cog=False)
+    colors = _sbprofile_colors(makeiter=True)
+
+    bands = ellipsefit['bands']
+    refband = ellipsefit['refband']
+
+    yminmax = [40, 0]
+    xminmax = [0.9, 0]
+    #xminmax = [1, 0]
+
+    ax1 = fig.add_subplot(gs2[0])
+    ax2 = fig.add_subplot(gs2[1], sharex=ax1)
+    for filt in bands:
+        col = next(colors)
+
+        mu = sbprofile['mu_{}'.format(filt)]
+        muerr = sbprofile['muerr_{}'.format(filt)]
+        if len(mu) == 0 or mu[0] == -1: # no good data
+            continue
+        radius = sbprofile['radius_{}'.format(filt)]**0.25
+
+        ax1.fill_between(radius, mu-muerr, mu+muerr, label=r'${}$'.format(filt),
+                         facecolor=col, edgecolor='k', lw=2, alpha=0.75)
+
+        if np.nanmin(mu-muerr) < yminmax[0]:
+            yminmax[0] = np.nanmin(mu-muerr)
+        if np.nanmax(mu+muerr) > yminmax[1]:
+            yminmax[1] = np.nanmax(mu+muerr)
+        if np.nanmax(radius) > xminmax[1]:
+            xminmax[1] = np.nanmax(radius)
+
+    ax1.set_ylabel(r'$\mu(r)$ (mag arcsec$^{-2}$)')
+    #ax1.set_ylabel(r'Surface Brightness $\mu(a)$ (mag arcsec$^{-2}$)')
+
+    ylim = [yminmax[0]-0.75, yminmax[1]+0.5]
+    if ylim[0] < 17:
+        ylim[0] = 17
+    if ylim[1] > 33:
+        ylim[1] = 33
+
+    if use_ylim is not None:
+        ax1.set_ylim(use_ylim)
+    else:
+        ax1.set_ylim(ylim)
+    ax1.invert_yaxis()
+
+    xlim = [xminmax[0], xminmax[1]*1.0]
+    ax1.set_xlim(xlim)
+
+    hh, ll = ax1.get_legend_handles_labels()
+    if len(hh) > 0:
+        leg1 = ax1.legend(loc='upper right', fontsize=18, frameon=True)
+        ax1.set_title('{} ({})'.format(onegal['GALAXY'][0], onegal['GROUP_NAME'][0].replace('_', ' ')))
+        #ax1.set_title(galaxyinfo[igal]['galaxy'][0])
+
+    # Now the color-radius plot
+    if sbprofile['radius_gr'][0] != -1:
+        ax2.fill_between(sbprofile['radius_gr']**0.25,
+                         sbprofile['gr'] - sbprofile['gr_err'],
+                         sbprofile['gr'] + sbprofile['gr_err'],
+                         label=r'$g - r$', facecolor=next(colors), alpha=0.75,
+                         edgecolor='k', lw=2)
+
+    if sbprofile['radius_rz'][0] != -1:
+        ax2.fill_between(sbprofile['radius_rz']**0.25,
+                         sbprofile['rz'] - sbprofile['rz_err'],
+                         sbprofile['rz'] + sbprofile['rz_err'],
+                         label=r'$r - z$', facecolor=next(colors), alpha=0.75,
+                         edgecolor='k', lw=2)
+
+    hh, ll = ax2.get_legend_handles_labels()
+    if len(hh) > 0:
+        ax2.legend(loc='upper right', fontsize=18, frameon=True)
+        #ax2.legend(bbox_to_anchor=(0.25, 0.98))
+
+    ax2.set_ylabel('Color (mag)')
+    ax2.set_ylim(0.4, 1.3)
+    ax2.set_xlim(xlim)
+    #ax2.autoscale(False) # do not scale further
+
+    for xx in (ax1, ax2):
+        xx.margins(x=0)
+        #xx.xaxis.set_ticklabels([])
+        ylim = xx.get_ylim()
+        xx.fill_between([0, (2*ellipsefit['psfsize_r'])**0.25],
+                        [ylim[0], ylim[0]], [ylim[1], ylim[1]], color='grey', alpha=0.1)
+
+    #ax2.text(0.05, 0.15, 'PSF\n(3$\sigma$)', ha='center', va='center',
+    #    transform=ax2.transAxes, fontsize=10)
+    ax1.text(0.07, 0.1, 'PSF\n(2$\sigma$)', ha='center', va='center',
+             transform=ax1.transAxes, fontsize=18)
+
+    ax2.set_xlabel(r'Semi-major axis $r^{1/4}$ (arcsec)$^{1/4}$')
+        
+    if png:
+        pngfile = os.path.join(figdir, png)
+        print('Writing {}'.format(pngfile))
+        fig.savefig(pngfile)#, bbox_inches='tight')
+        plt.close(fig)
+
 def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--sky', action='store_true')
-    parser.add_argument('--surface-brightness', action='store_true')
+    parser.add_argument('--sbmontage', action='store_true')
+    parser.add_argument('--sbmontage-gallery', action='store_true')
     parser.add_argument('--sb-mag', action='store_true')
-
-    parser.add_argument('--gallery', action='store_true')
-    parser.add_argument('--skysub-tests', action='store_true')
-    parser.add_argument('--choose-skyannulus', action='store_true')
-    parser.add_argument('--ccdpos', action='store_true')
-    parser.add_argument('--model-and-mask', action='store_true')
-    parser.add_argument('--ellipse-multiband', action='store_true')
-    parser.add_argument('--clobber', action='store_true', help='Overwrite existing files.')
+    parser.add_argument('--size-mag', action='store_true')
     args = parser.parse_args()
-
-    sample = legacyhalos.SGA.read_sample()#galaxylist='PGC193199_GROUP')
-    #fullsample = legacyhalos.SGA.read_sample(galaxylist='PGC193199_GROUP', preselect_sample=False)
 
     if False:
         galaxy, galaxydir = get_galaxy_galaxydir(sample)
@@ -679,43 +995,41 @@ def main():
     
     # Fig - spatial distribution on the sky
     if args.sky:
+        sample = legacyhalos.SGA.read_sample()
         fig_sky(png='sga-sky.png')
 
     # Fig - bivariate scatterplot of surface brightness vs magnitude
     if args.sb_mag:
+        sample = legacyhalos.SGA.read_sample()
         fig_sb_mag(sample, png='sb-vs-mag.png')
     
-    ## Fig - gallery of clusters
-    #if args.gallery:
-    #    fig_gallery(sample, png='gallery.png')
-    #
-    ## Fig XX - CCD position
-    #if args.ccdpos:
-    #    fig_ccdpos(sample, thisgalaxy='0000139-017663658', png='ccdpos.png')
-    #
-    ## Fig - sky subtraction diagnostic plots
-    #if args.skysub_tests:
-    #    fig_skysub_tests(sample, png='skysub_tests.png')
-    #
-    ## Fig - sky subtraction annulus diagnostic plot
-    #if args.choose_skyannulus:
-    #    fig_choose_skyannulus(sample, png='choose_skyannulus.png')
-    #
-    ## Fig - model and mask multipanel plot
-    #if args.model_and_mask:
-    #    fig_model_and_mask(sample, thisgalaxy='0001129-034040952', png='model_and_mask.png')
-    #
-    ## Fig - ellipse_multiband
-    #if args.ellipse_multiband:
-    #    fig_ellipse_multiband(sample, thisgalaxy='0001129-034040952', png='ellipse_multiband.png')
-    #
-    # Fig - surface brightness
-    if args.surface_brightness:
-        fig_surface_brightness(sample, thisgalaxy='PGC193199_GROUP', png='PGC193199_GROUP-sbmontage.png')
+    # Fig - bivariate scatterplot of size vs magnitude
+    if args.size_mag:
+        sample = legacyhalos.SGA.read_sample()
+        fig_size_mag(sample, png='size-vs-mag.png')
+    
+    # Fig - SB montage
+    if args.sbmontage:
+        sample = legacyhalos.SGA.read_sample(galaxylist='PGC193199')
+        fig_sbmontage(sample, png='PGC193199-sbmontage.png')
         #for gal in galaxy:
         #    fig_surface_brightness(sample, thisgalaxy=gal, png='surface_brightness_{}.png'.format(gal))
         #fig_surface_brightness(sample, thisgalaxy='0000195-052316929', png='surface_brightness.png')
         #fig_surface_brightness(sample, thisgalaxy='0001129-034040952', png='surface_brightness.png')
+
+    # Fig - SB montage gallery
+    if args.sbmontage_gallery:
+        if False:
+            from astrometry.libkd.spherematch import match_radec
+            saga = Table.read(os.path.join(os.getenv('HOME'), 'research', 'projects', 'SGA', 'sample', 'catalogs', 'saga_hosts.csv'))
+            m1, m2, d12 = match_radec(sample['RA'], sample['DEC'], saga['RA'], saga['DEC'], 5/3600.0, nearest=True)
+            out = sample[m1]
+            out.write(os.path.join(figdir, 'saga.fits'), overwrite=True)
+        else:
+            sample = Table.read(os.path.join(figdir, 'saga.fits'))
+            for onegal in sample:
+                fig_sbmontage_gallery(onegal, png='gallery/sbmontage-{}.png'.format(onegal['GALAXY'][0]))
+                pdb.set_trace()
 
 if __name__ == '__main__':
     main()
