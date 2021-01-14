@@ -2,6 +2,7 @@
 """Generate the figures for the SGA AAS poster.
 
 /mnt/code/talks-and-plots/2021/20210115-aas-sga/build-figures --surface-brightness
+/global/homes/i/ioannis/repos/git/talks-and-plots/2021/20210115-aas-sga/build-figures --sbmontage-gallery
 
 """
 import os, sys, time, pdb
@@ -780,7 +781,7 @@ def fig_sbmontage_gallery(onegal, png):
 
     data, galaxyinfo = read_multiband(galaxy, galaxydir, filesuffix=filesuffix, verbose=True)
 
-    igal = 1
+    igal = 0
     galaxy_id = '{}'.format(data['galaxy_id'][igal])
     #galaxy_id = '1121465'
     #galaxy_indx = 1
@@ -871,7 +872,7 @@ def fig_sbmontage_gallery(onegal, png):
         xx.yaxis.set_ticks([])
 
     # [2] surface brightness and color profile
-    gs2 = fig.add_gridspec(2, 1, bottom=0.08, top=0.93, left=0.42,
+    gs2 = fig.add_gridspec(2, 1, bottom=0.12, top=0.93, left=0.42,
                            right=0.98, hspace=0.04, height_ratios=[2.9, 1.4])
     
     minerr, use_ylim, plot_radius = 0.0, None, False
@@ -929,7 +930,10 @@ def fig_sbmontage_gallery(onegal, png):
     hh, ll = ax1.get_legend_handles_labels()
     if len(hh) > 0:
         leg1 = ax1.legend(loc='upper right', fontsize=18, frameon=True)
-        ax1.set_title('{} ({})'.format(onegal['GALAXY'][0], onegal['GROUP_NAME'][0].replace('_', ' ')))
+        if onegal['GROUP_MULT'] > 1:
+            ax1.set_title('{} ({})'.format(onegal['GALAXY'], onegal['GROUP_NAME'].replace('_', ' ')))
+        else:
+            ax1.set_title(onegal['GALAXY'])
         #ax1.set_title(galaxyinfo[igal]['galaxy'][0])
 
     # Now the color-radius plot
@@ -953,7 +957,7 @@ def fig_sbmontage_gallery(onegal, png):
         #ax2.legend(bbox_to_anchor=(0.25, 0.98))
 
     ax2.set_ylabel('Color (mag)')
-    ax2.set_ylim(0.4, 1.3)
+    ax2.set_ylim(-1, 2)
     ax2.set_xlim(xlim)
     #ax2.autoscale(False) # do not scale further
 
@@ -1026,10 +1030,11 @@ def main():
             out = sample[m1]
             out.write(os.path.join(figdir, 'saga.fits'), overwrite=True)
         else:
+            #if False:
             sample = Table.read(os.path.join(figdir, 'saga.fits'))
-            for onegal in sample:
-                fig_sbmontage_gallery(onegal, png='gallery/sbmontage-{}.png'.format(onegal['GALAXY'][0]))
-                pdb.set_trace()
+            for onegal in sample[:45]:
+                fig_sbmontage_gallery(onegal, png='gallery/sbmontage-{}.png'.format(onegal['GALAXY']))
+            #else:
 
 if __name__ == '__main__':
     main()
