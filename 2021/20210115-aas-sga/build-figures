@@ -231,9 +231,10 @@ def fig_sky(png=None):
     sns, _ = plot_style(talk=True, font_scale=0.8)
 
     # read the sample
-    S = fits_table(os.path.join(figdir, 'SGA-ellipse-v3.2.kd.fits'),
-                   columns='ra dec preburned type diam in_footprint in_footprint_grz sga_id'.split())
-    S.cut(S.sga_id > -1)    
+    version = 'v3.2'
+    samplefile = os.path.join('/mnt/SGA-data-2020/SGA-ellipse-{}.fits'.format(version))
+    S = fits_table(samplefile, columns='ra dec preburned type diam in_footprint in_footprint_grz sga_id'.split())
+    S.cut((S.sga_id > -1) * (S.preburned))
     print(len(S))
 
     # initialize the projection
